@@ -1,0 +1,306 @@
+---
+title: "Projeto_Monografia"
+author: "Fernando Biscaia Veiga"
+date: "1 de maio de 2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Introdução
+
+A forma como atualmente funciona a Previdência Social Brasileira se mostra não sustentável a longo prazo e põe em risco a aposentadoria das atuais e futuras gerações. Isto porque, no formato atual a população economicamente ativa sustenta os já aposentados.
+Ao início deste formato, a pirâmide etária da população possuía uma baixa proporção de pessoas idosas. A maior parcela da população se mantinha ativa sustentando uma pequena fatia da mesma, de pessoas já aposentadas.
+Porém, as projeções já para as próximas décadas indicam a inversão da pirâmide etária. Cada vez mais, a alta proporção de idosos se tornará um desafio para a Previdência Social. 
+Isto fez com que a busca por maneiras de garantir a aposentadoria sem a necessidade da Previdência Social popularizasse os investimentos na bolsa de valores Brasileira, tendo aumentado consideravelmente o número de investidores nos últimos anos.
+Contudo, para que a aplicação de recursos na bolsa de valores seja eficaz enquanto ferramenta previdenciária é necessário que as aplicações sejam baseadas no estudo das empresas listadas em bolsa. Primeiramente através do estudo individual das empresas as quais pretende-se investir, afim de verificar a qualidade e sustentabilidade das mesmas.
+Para isso, o estudo dos indicadores fundamentalistas da empresa são essenciais para que o investidor possa fazer um retrato da empresa e decidir se vale a pena o investimento no ativo.
+Considerando as oscilações naturais no mercado financeiro, é prudente a diversificação dos investimentos como forma de amenizar o risco. E neste ponto, cabe a avaliação da correlação entre as empresas. Investir em empresas com comportamento similares traria pouco benefício em relação ao risco, visto que momentos de crise em uma empresa poderia refletir nas demais da carteira.
+Neste sentido, a junção de duas análises podem vir a servir como insumo para tomada de decisões quanto a quais empresas investir. O agrupamento entre as empresas que apresentam os melhores fundamentos, através da aplicação do algoritmo k-means, avaliado conjuntamente com a correlação temporal dos preços das ações, objetivando a montagem de uma carteira de investimentos com as empresas de melhores fundamentos não correlacionadas.
+
+
+
+## Base de Dados
+
+Para o presente estudo, duas bases de dados foram utilizadas. A primeira referente as cotações históricas dos tickers listados na B3. A outra refere-se aos indicadores fundamentalistas das empresas.
+A base de cotações históricas foi extraída no R através do pacote "BatchGetSymbols" contemplando o período de 01-01-2019 até 31-12-2021.
+A base de indicadores fundamentalistas foi extraída do site "https://www.fundamentus.com.br/detalhes.php?papel=" via Web Scraping.
+
+
+
+
+## Tratamento dos dados de cotações
+
+
+Com relação as cotações, foi observado o período de três anos, considerando sempre o valor de fechamento diário. Parte das empresas avaliadas não estava listada em bolsa na data incial de análise, gerando dados faltantes até a data de entrada na bolsa de valores.  ***POR ALGUM MOTIVO NÃO ESTOU CONSEGUINDO MAIS EXTRAIR OS DADOS ATRAVÉS DA LIBRARY "BatchGetSymbols". ESTOU VENDO ESSA QUESTÃO PARA COLOCAR O CÓDIGO DE EXTRAÇÃO AQUI (Estes dados serão usados para o cálculo de correlação dos valores das ações. Já tenho essa base extraída, mas vou buscar trazer automaticamente para meu código)
+
+
+## Tratamento dos dados de indicadores fundamentalistas
+
+
+```{r lib, echo=FALSE}
+library(tidyverse)
+library(ralger)
+library(lattice)
+library(rpanel)
+library(rgl)
+library(corrplot)
+library(dendextend)
+library(NbClust)
+library(cluster)
+library(factoextra)
+library(fpc)
+library(dbscan)
+library(mclust)
+library(pvclust)
+
+```
+
+```{r ind_fund, echo=FALSE}
+
+#Relação dos tickers listados na bolda de valores
+
+lista2 <- c('AALR3','ABCB4','ABEV3','ADHM3','AELP3','AERI3','AESB3','AFLT3',
+            'AGRO3','AGXY3','AHEB3','ALLD3','ALPA3','ALPK3','ALSO3','ALUP3',
+            'AMAR3','AMBP3','AMER3','ANIM3','APER3','ARML3','ARZZ3','ASAI3',
+            'ATMP3','ATOM3','AURA33','AUTM3','AVLL3','AZEV3','AZUL4','B3SA3',
+            'BAHI3','BALM3','BAUH4','BAZA3','BBAS3','BBDC3','BBRK3','BBSE3',
+            'BDLL3','BEEF3','BEES3','BGIP3','BHGR3','BIDI3','BIOM3','BKBR3',
+            'BLAU3','BLUT3','BMEB3','BMGB4','BMIN3','BMKS3','BMOB3','BNBR3',
+            'BOAS3','BOBR3','BPAC3','BPAN4','BPHA3','BRAP3','BRBI11','BRFS3',
+            'BRGE3','BRIT3','BRIV3','BRKM3','BRML3','BRPR3','BRSR3','BSLI3',
+            'BUET3','CALI3','CAMB3','CAML3','CARD3','CASH3','CASN3','CBAV3',
+            'CBEE3','CBMA3','CCRO3','CEAB3','CEBR3','CEDO3','CEEB3','CEED3',
+            'CEGR3','CEPE3','CESP3','CGAS3','CGRA3','CIEL3','CLSA3','CLSC3',
+            'CMIG3','CMIN3','COCE3','COGN3','CORR3','CPFE3','CPLE3','CRDE3',
+            'CREM3','CRIV3','CRPG3','CSAB3','CSAN3','CSED3','CSMG3','CSNA3',
+            'CSRN3','CTKA3','CTNM3','CTSA3','CURY3','CVCB3','CXSE3','CYRE3',
+            'CZLT33','DAGB33','DASA3','DESK3','DEXP3','DHBI3','DIRR3','DMMO3',
+            'DMVF3','DOHL3','DOTZ3','DTCY3','DXCO3','EALT3','ECOR3','ECPR3',
+            'EGIE3','EKTR3','ELET3','ELMD3','ELPL3','EMAE4','EMBR3','ENAT3',
+            'ENBR3','ENEV3','ENGI3','ENJU3','ENMT3','EPAR3','EQMA3B','EQPA3',
+            'EQTL3','ESPA3','ESTR3','ETER3','EUCA3','EVEN3','EZTC3','FBMC3',
+            'FESA3','FHER3','FIBR3','FIGE3','FIQE3','FLRY3','FRAS3','FRIO3',
+            'FRTA3','GEPA3','GETT3','GFSA3','GGBR3','GGPS3','GMAT3','GNDI3',
+            'GOAU3','GOLL4','GPAR3','GPIV33','GRND3','GSHP3','GUAR3','HAGA3',
+            'HAPV3','HBOR3','HBRE3','HBSA3','HBTS5','HETA3','HOOT4','HYPE3',
+            'IFCM3','IGBR3','IGTI3','IMBI3','INEP3','INTB3','IRBR3','ITSA3',
+            'ITUB3','JALL3','JBSS3','JFEN3','JHSF3','JOPA3','JSLG3','KEPL3',
+            'KLBN3','KRSA3','LAME3','LAND3','LAVV3','LCAM3','LEVE3','LFFE3',
+            'LIGT3','LIPR3','LJQQ3','LLIS3','LOGG3','LOGN3','LPSB3','LREN3',
+            'LUPA3','LUXM3','LVTC3','LWSA3','MAPT3','MATD3','MBLY3','MDIA3',
+            'MDNE3','MEAL3','MEGA3','MELK3','MEND6','MERC3','MGEL3','MGLU3',
+            'MILS3','MLAS3','MMAQ3','MMXM3','MNDL3','MNPR3','MOAR3','MODL3',
+            'MOSI3','MOVI3','MRFG3','MRSA3B','MRVE3','MSPA3','MTIG3','MTRE3',
+            'MTSA4','MULT3','MWET3','MYPK3','NEOE3','NGRD3','NINJ3','NORD3',
+            'NTCO3','NUTR3','ODER4','ODPV3','OFSA3','OGXP3','OIBR3','OMGE3',
+            'ONCO3','OPCT3','ORVR3','OSXB3','PARD3','PATI3','PCAR3','PDGR3',
+            'PDTC3','PEAB3','PETR3','PETZ3','PFRM3','PGMN3','PINE4','PLAS3',
+            'PLPL3','PMAM3','PNVL3','POMO3','PORT3','POSI3','POWE3','PRIO3',
+            'PRML3','PRNR3','PRVI3','PSSA3','PTBL3','PTNT3','QUAL3','RADL3',
+            'RAIL3','RAIZ4','RANI3','RAPT3','RCSL3','RDNI3','RDOR3','RDTR3',
+            'RECV3','REDE3','RENT3','RJCP3','RNEW3','ROMI3','RPAD3','RPMG3',
+            'RRRP3','RSID3','RSUL4','SANB3','SAPR3','SBFG3','SBSP3','SCAR3',
+            'SCLO3','SEER3','SEMP3','SEQL3','SGPS3','SHOW3','SHUL4','SIMH3',
+            'SJOS3','SLCE3','SLED3','SMFT3','SMTO3','SNSY5','SOJA3','SOMA3',
+            'SOND3','SQIA3','STBP3','SULA3','SULT3','SUZB3','SYNE3','TAEE3',
+            'TASA3','TCNO3','TCSA3','TECN3','TEKA3','TELB3','TEND3','TENE5',
+            'TERI3','TFCO4','TGMA3','TIMS3','TKNO4','TOTS3','TPIS3','TRAD3',
+            'TRIS3','TRPL3','TTEN3','TUPY3','TXRX3','UCAS3','UGPA3','UNIP3',
+            'USIM3','VALE3','VAMO3','VBBR3','VIIA3','VITT3','VIVA3','VIVR3',
+            'VIVT3','VLID3','VSPT3','VULC3','VVAR4','VVEO3','WEGE3','WEST3',
+            'WHRL3','WIZS3','WLMM3','YDUQ3'
+            )
+
+#Extraindo dados de indicadores fundamentalistas
+
+indicadores <- function(cod_acao){
+  
+  # tabela de indicadores fundamentalistas
+  dados_fundamentus <- table_scrap(paste0("https://www.fundamentus.com.br/detalhes.php?papel=",cod_acao),choose = 3)
+  
+  # retirando colunas que tratam de oscilações do preço da ação
+  dados_fundamentus <- dados_fundamentus[,-c(1,2)]
+  
+  dados_fundamentus1 <- dados_fundamentus[,1:2]
+  dados_fundamentus2 <- dados_fundamentus[,3:4]
+  
+  dados_fundamentus_all <- rbind(dados_fundamentus1, dados_fundamentus2)
+  
+  dados_fundamentus_all <- dados_fundamentus_all %>% `colnames<-`(c("indicador", "valor"))
+  
+  # retirando "?" no começo de cada termo
+  dados_fundamentus_all$indicador <- sub("^.", "", dados_fundamentus_all$indicador)
+  
+  # renomeando colunas
+  dados_fundamentus_all$indicador <- recode(dados_fundamentus_all$indicador,
+                                            `P/L`= "P_L",
+                                            `P/VP`= "P_VP",
+                                            `P/EBIT`= "P_EBIT",
+                                            `P/Ativos`= "P_Ativos",
+                                            `P/Cap. Giro` = "P_Cap_Giro",
+                                            `P/Ativ Circ Liq` = "P_Ativo_Circ_Liq",
+                                            `Div. Yield` = "Div_Yield",
+                                            `EV / EBITDA` = "EV_EBITDA",
+                                            `EV / EBIT` = "EV_EBIT",
+                                            `Cres. Rec (5a)`= "Cres_Rec_5anos",
+                                            `Marg. Bruta` = "Margem_Bruta",
+                                            `Marg. EBIT` = "Marg_EBIT",
+                                            `Marg. Líquida` = "Marg_Liquida",
+                                            `EBIT / Ativo` = "EBIT_Ativo",
+                                            `Liquidez Corr` = "Liquidez_Corrente",
+                                            `Div Br/ Patrim` = "Div_Bruta_Patrimonio",
+                                            `Giro Ativos` = "Giro_Ativos"
+                                            )
+  
+  
+  # criando coluna com nome da ação e alterando a estrutura do banco de dados
+  dados_fundamentus_all <- dados_fundamentus_all %>%
+    mutate(Acao = cod_acao) %>%
+    spread(key = indicador, value = valor)
+  
+  
+}
+
+
+ind_fund <- map_df(c(lista2), indicadores)
+names(ind_fund)[c(1)] <- c("ticker")
+
+
+ind_fund[ind_fund == "-"] <- NA
+
+
+
+# retirando "%"
+ind_fund <- as.data.frame(sapply(ind_fund,function(x) gsub("%","", as.character(x))))
+
+# convertendo colunas em númericas
+ind_fund[,-1] <- as.data.frame(sapply(ind_fund[,-1],
+        function(x) as.numeric(as.numeric(gsub(",", ".", gsub("\\.", "",as.character(x)))))))
+
+```
+
+Um ponto que impactaria a aplicação do algoritmo de k-means foi o fato de terem empresas com indicadores faltantes (NA's). Para não impactar no algoritmo, optou-se pela retirada dessas empresas da análise.
+Outro tratamento avaliado foi referente a presença de outliers para alguns indicadores em determinadas empresas.
+Como, por exemplo, empresa com Margem Líquida de -124126, conforme gráfico abaixo.
+
+```{r boxp_ml}
+boxplot(ind_fund$Marg_Liquida)
+```
+
+Para estes casos, foram avaliados pontos de corte para cada uma das variáveis e optou-se pela retirada dos tickers da análise. Outro ponto foi a exclusão das variávies P_Cap_Giro, Cres_Rec_5anos.
+
+
+## Análise gráfica das variáveis mantidas
+
+Para o andamento da análise, as variáveis foram avaliadas individualmente no sentido de definir critérios para exclusão de outliers.
+
+
+```{r boxp_tot}
+boxplot(ind_fund$P_L, ind_fund$P_VP, ind_fund$P_EBIT, ind_fund$PSR, ind_fund$P_Ativos)
+boxplot(ind_fund$Giro_Ativos, ind_fund$P_Ativo_Circ_Liq, ind_fund$Div_Yield, ind_fund$EV_EBIT, ind_fund$EV_EBITDA)
+boxplot(ind_fund$LPA, ind_fund$VPA, ind_fund$Margem_Bruta, ind_fund$Marg_EBIT, ind_fund$Marg_Liquida)
+boxplot(ind_fund$EBIT_Ativo, ind_fund$ROIC, ind_fund$ROE, ind_fund$Liquidez_Corrente, ind_fund$Div_Bruta_Patrimonio)
+```
+
+
+```{r otlrs, echo=FALSE}
+ind_fund2 <- na.omit(ind_fund)
+ind_fund2 <- select(ind_fund2, -c(P_Cap_Giro, Cres_Rec_5anos))
+
+ind_fund2 <- filter(ind_fund2, P_L > -100)
+ind_fund2 <- filter(ind_fund2, P_L < 150)
+
+ind_fund2 <- filter(ind_fund2, VPA > -200)
+ind_fund2 <- filter(ind_fund2, VPA < 200)
+
+ind_fund2 <- filter(ind_fund2, PSR < 50)
+
+ind_fund2 <- filter(ind_fund2, Marg_Liquida > -100)
+ind_fund2 <- filter(ind_fund2, Marg_Liquida < 100)
+
+ind_fund2 <- filter(ind_fund2, ROE > -200)
+
+ind_fund2 <- filter(ind_fund2, EV_EBITDA < 500)
+
+ind_fund2 <- filter(ind_fund2, EV_EBIT > -200)
+ind_fund2 <- filter(ind_fund2, EV_EBIT < 200)
+
+ind_fund2 <- filter(ind_fund2, P_Ativo_Circ_Liq < 200)
+
+```
+
+Ao final dos critérios para retirada de outliers e da retirada das linhas contendo NA's, de 396 tickers inciais, foram mantidos 268 para a análise.
+
+
+
+## Metodologia
+
+O trabalho objetiva a obtenção de insumos para montagem de uma carteira de investimentos. ao fazer a análise fundamentalista de uma determinada empresa, um indicador não deve ser considerado isoladamente. É necessária a avaliação conjunta para melhor tomada de decisão quanto a viabilidade de investimento em uma empresa.Além disso, em complemento aos fundamentos de uma empresa, é necessário que as empresas selecionadas para a composição da carteira de investimentos não seja correlacionada.
+Baseado nisto o projeto abrange duas etapas. Primeiramente a aplicação do algoritmo de k-means para agrupar as empresas através de seus indicadores fundamentalista. Neste passo objetiva-se agrupar as empresas que possuam qualidades semelhantes quanto aos seus fundamentos.
+Após a definição dos agrupamentos, ao selecionar um agrupamento que contenha as empresas com os comportamentos dos fundamentos desejado, avaliar dentro do grupo quais as menos correlacionadas em relação as suas cotações históricas.
+
+
+
+
+## Resultados
+
+
+Ainda estou avaliando sobre os agrupamentos. Mas o primeiro passo é a definição do número ótimo de grupos
+
+```{r n_otimo, echo=FALSE}
+ind_fund3 <- ind_fund2
+
+ticker <- ind_fund3$ticker
+ind_fund3$ticker <- NULL
+
+ind_fund_pad <- ind_fund3 %>%
+  as.matrix() %>%
+  scale(center = TRUE, scale = TRUE)
+
+layout(1)
+fviz_nbclust(ind_fund_pad, hcut, method = "wss")
+fviz_nbclust(ind_fund_pad, hcut, method = "silhouette")
+
+k_max <- 10
+wss <- map_dbl(1:k_max, ~{kmeans(select(ind_fund2, -ticker), ., nstart=50,iter.max = 15 )$tot.withinss})
+
+
+plot(x = 1:k_max,
+     y = wss,
+     type = "o",
+     pch = 19,
+     ylim = c(0, wss[1]),
+     xlab = "Número de clusters",
+     ylab = "Somas de quadrados intra cluster")
+
+```
+
+
+Após definir o número ótimo de grupos, aplicar o agrupamento.
+
+
+
+```{r kmeans, echo=FALSE}
+clusters <- kmeans(select(ind_fund2, -ticker), centers = 3)
+
+centers <- rownames_to_column(as.data.frame(clusters$centers), "cluster")
+
+
+ind_fund2 <- ind_fund2 %>% 
+  mutate(cluster = clusters$cluster)
+```
+
+
+Após definidos os agrupamentos, nesta etapa eu trarei as correlações entre as empresas baseado no histórico de cotações.
+No final todas essas informações serão colocadas em um dashboard para poder avaliar os resultados iterativamente.
+
+Ao final, descrever os comportamentos dentro dos agrupamentos, mostrar as características semelhantes entre as empresas que compõe cada grupo.
+
+
+## Discussão
+
+Nesta etapa penso em descrever como o dashboard final poderá ser usado como insumo para seleção de empresas a compor uma carteira de investimentos. Outra ideia é buscar simular como teria sido o desempenho dessa carteira caso tivesse sido usado os resultados aqui obtidos para montagem de uma carteira de investimento a algum tempo atrás.
